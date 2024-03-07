@@ -74,16 +74,12 @@ export class FetchInterceptor extends Interceptor<HttpRequestEventMap> {
       const signal = interactiveRequest.signal
       const requestAborted = new DeferredPromise()
 
-      // Signal isn't always defined in react-native.
-      if (signal) {
-        signal.addEventListener(
-          'abort',
-          () => {
-            requestAborted.reject(signal.reason)
-          },
-          { once: true }
-        )
+      const rejectOnAbort = () => {
+        requestAborted.reject(signal.reason)
       }
+
+      // Signal isn't always defined in react-native.
+      signal?.addEventListener('abort', rejectOnAbort, { once: true })
 
       const resolverResult = await until(async () => {
         const listenersFinished = emitAsync(this.emitter, 'request', {
@@ -107,6 +103,8 @@ export class FetchInterceptor extends Interceptor<HttpRequestEventMap> {
 
         return mockedResponse
       })
+
+      signal?.removeEventListener('abort', rejectOnAbort)
 
       if (requestAborted.state === 'rejected') {
         return Promise.reject(requestAborted.rejectionReason)
